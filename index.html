@@ -362,6 +362,7 @@ function openLesson(t) {
   el.innerHTML = `<div class="qmeta"><span></span><span>${state.read[t] ? "読了 " + state.read[t] : ""}</span></div>
     <h3></h3>
     <video controls preload="none" playsinline src="video/L${pad2(topicNo(t))}.mp4"></video>
+    <button class="btn" id="l-after" hidden>動画を見た。3問で確かめる</button>
     <div class="body"></div>
     <div class="points"><b>要点</b><ul></ul></div>
     <div><span class="muted" style="font-size:13px">英語では</span><div class="en"></div></div>
@@ -373,11 +374,14 @@ function openLesson(t) {
   (l.en || []).forEach(([ja, en]) => { const e = document.createElement("span"); e.textContent = ja; const i = document.createElement("i"); i.textContent = en; e.append(i); el.querySelector(".en").append(e); });
   l.points.forEach((p) => { const e = document.createElement("li"); e.textContent = p; el.querySelector("ul").append(e); });
   $("#l-back").onclick = closeLesson;
-  $("#l-quiz").onclick = () => {
+  const finishLesson = () => {
     const today = dkey();
     if (!state.read[t]) { state.read[t] = today; state.reads[today] = (state.reads[today] || 0) + 1; save(); }
     closeLesson(); $("#topic-sel").value = t; start(3);
   };
+  $("#l-quiz").onclick = finishLesson;
+  $("#l-after").onclick = finishLesson;
+  el.querySelector("video").addEventListener("ended", () => { $("#l-after").hidden = false; $("#l-after").focus(); });
   $("#start-sec").hidden = true; $("#quiz-sec").hidden = true; $("#next-lesson").hidden = true; $("#fergie").hidden = true;
   $("#lesson-sec").hidden = false;
   $("#lesson-sec").scrollIntoView({ block: "start", behavior: "smooth" });
@@ -449,7 +453,7 @@ function renderStats() {
 
 document.addEventListener("click", (e) => {
   const st = e.target.closest("[data-start]"); if (st) { start(st.dataset.start); return; }
-  const ls = e.target.closest("[data-lesson]"); if (ls) { openLesson(ls.dataset.lesson); return; }
+  const ls = e.target.closest("[data-lesson]"); if (ls) { e.preventDefault(); openLesson(ls.dataset.lesson); return; }
   const tp = e.target.closest("[data-topic]"); if (tp) { $("#topic-sel").value = tp.dataset.topic; start(10); }
 });
 document.addEventListener("keydown", (e) => {
@@ -564,7 +568,7 @@ $("#car-btn").onclick = () => {
   try { Q = await (await fetch("questions.json")).json(); } catch { setSync("問題集を読み込めませんでした"); return; }
   [...new Set(Q.map((q) => q.topic))].forEach((t) => $("#topic-sel").append(new Option(t, t)));
   try { L = await (await fetch("lessons.json")).json(); } catch {}
-  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><b>${t}</b><span class="vlinks"><a href="video/L${pad2(i)}.mp4" target="_blank" rel="noopener">解説の動画</a><a href="video/${pad2(i)}.mp4" target="_blank" rel="noopener">問題の動画</a></span><span class="muted">解説</span><audio controls preload="none" src="audio/L${pad2(i)}.m4a"></audio><span class="muted">問題</span><audio controls preload="none" src="audio/${pad2(i)}.m4a"></audio></div>`).join("");
+  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><b>${t}</b><span class="vlinks"><a href="#" data-lesson="${t}">解説を開く（動画つき）</a><a href="video/${pad2(i)}.mp4" target="_blank" rel="noopener">問題の動画</a></span><span class="muted">解説</span><audio controls preload="none" src="audio/L${pad2(i)}.m4a"></audio><span class="muted">問題</span><audio controls preload="none" src="audio/${pad2(i)}.m4a"></audio></div>`).join("");
   renderStats();
 })();
 </script>
