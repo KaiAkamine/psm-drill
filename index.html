@@ -109,6 +109,20 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
 .audios{display:flex;flex-direction:column;gap:10px}
 .audios div{display:flex;flex-direction:column;gap:2px;font-size:14px}
 .audios audio{width:100%}
+.next{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;padding:12px 14px}
+.next .t{font-size:12px;color:var(--muted)}
+.next b{display:block;font-size:17px}
+.lesson-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
+@media (max-width:420px){.lesson-list{grid-template-columns:1fr}}
+.lesson-list button{background:none;border:0;padding:4px 0;text-align:left;font-size:14px;display:flex;gap:8px;align-items:center;color:var(--ink)}
+.lesson-list .mark{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.lesson-list .mark.on{background:var(--good);border-color:var(--good)}
+.lesson h3{font-family:var(--f-display);font-weight:400;font-size:21px;margin:0;line-height:1.4;text-wrap:balance}
+.lesson p{margin:0;max-width:65ch}
+.lesson .body{display:flex;flex-direction:column;gap:12px}
+.points{background:var(--gold-soft);border-radius:10px;padding:12px 14px}
+.points ul{margin:4px 0 0;padding-left:20px}
+.lesson audio{width:100%}
 </style>
 </head>
 <body>
@@ -126,8 +140,13 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
   </div>
 
   <div class="fergie" id="fergie" hidden>
-    <div><b>ファーギータイム</b><br><span class="muted">今日はまだ0問。1問解けば連続記録が続きます。</span></div>
+    <div><b>ファーギータイム</b><br><span class="muted">今日はまだ何もしていません。1問解くか解説を1つ読めば、連続記録が続きます。</span></div>
     <button class="btn" data-start="1">1問だけ解く</button>
+  </div>
+
+  <div class="next" id="next-lesson" hidden>
+    <div><span class="t">次に読む解説</span><b id="next-title"></b><span class="muted" id="next-lead" style="font-size:13px"></span></div>
+    <button class="btn" id="next-btn">読む</button>
   </div>
 
   <section id="start-sec">
@@ -143,8 +162,19 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
     </div>
   </section>
 
+  <section id="lesson-sec" hidden>
+    <article class="quiz lesson" id="lesson"></article>
+  </section>
+
   <section id="quiz-sec" hidden>
     <div class="quiz" id="quiz"></div>
+  </section>
+
+  <section>
+    <h2>解説（まず知識を入れる）</h2>
+    <div class="card">
+      <div class="lesson-list" id="lesson-list"></div>
+    </div>
   </section>
 
   <section>
@@ -176,7 +206,7 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
       <div id="car-heard" class="muted" style="font-size:13px"></div>
     </div>
     <div class="card">
-      <p><b>聞くだけ</b>：テーマ別の音声です。問題、考える間、正解と解説の順に流れます。</p>
+      <p><b>聞くだけ</b>：テーマ別の音声です。最初は「解説」を聞いて知識を入れ、慣れたら「問題」に進んでください。問題の音声は、問題、考える間、正解と解説の順に流れます。</p>
       <div class="audios" id="audios"></div>
     </div>
   </section>
@@ -201,12 +231,13 @@ const addDays = (k, n) => { const d = new Date(k + "T00:00:00"); d.setDate(d.get
 const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 let Q = [];
-let state = { srs: {}, days: {}, mocks: [] };
+let state = { srs: {}, days: {}, mocks: [], read: {}, reads: {} };
+let L = [];
 let session = null;
 
 // ---------- 保存（db があればクラウド、無ければこのブラウザだけ） ----------
 function setSync(t) { $("#sync").textContent = t; }
-function loadLocal() { try { const s = JSON.parse(localStorage.getItem("psm-state")); if (s) state = { srs: {}, days: {}, mocks: [], ...s }; } catch {} }
+function loadLocal() { try { const s = JSON.parse(localStorage.getItem("psm-state")); if (s) state = { ...state, ...s }; } catch {} }
 function saveLocal() { try { localStorage.setItem("psm-state", JSON.stringify(state)); } catch {} }
 function save() { saveLocal(); }
 
@@ -225,7 +256,7 @@ function start(kind) {
   const mock = kind === "mock";
   const list = mock ? shuffle(Q).slice(0, 20) : pickQueue(Number(kind), topic);
   session = { list, i: 0, correct: 0, mock, deadline: mock ? Date.now() + 15 * 60 * 1000 : 0, picked: new Set(), answered: false, order: [] };
-  $("#start-sec").hidden = true; $("#fergie").hidden = true; $("#quiz-sec").hidden = false;
+  $("#start-sec").hidden = true; $("#fergie").hidden = true; $("#next-lesson").hidden = true; $("#quiz-sec").hidden = false;
   renderQ();
   if (mock) tick();
   $("#quiz-sec").scrollIntoView({ block: "start", behavior: "smooth" });
@@ -313,11 +344,39 @@ function finish() {
   $("#back").onclick = () => { $("#quiz-sec").hidden = true; $("#start-sec").hidden = false; renderStats(); };
 }
 
+// ---------- 解説 ----------
+const pad2 = (i) => String(i + 1).padStart(2, "0");
+const topicNo = (t) => [...new Set(Q.map((q) => q.topic))].indexOf(t);
+
+function openLesson(t) {
+  const l = L.find((x) => x.topic === t); if (!l) return;
+  const el = $("#lesson");
+  el.innerHTML = `<div class="qmeta"><span></span><span>${state.read[t] ? "読了 " + state.read[t] : ""}</span></div>
+    <h3></h3><div class="body"></div>
+    <div class="points"><b>要点</b><ul></ul></div>
+    <div><span class="muted" style="font-size:13px">音声で聞く</span><audio controls preload="none" src="audio/L${pad2(topicNo(t))}.m4a"></audio></div>
+    <div class="actions"><button class="btn ghost" id="l-back">戻る</button><button class="btn" id="l-quiz">読んだ。3問で確かめる</button></div>`;
+  el.querySelector(".qmeta span").textContent = t;
+  el.querySelector("h3").textContent = l.lead;
+  l.body.forEach((p) => { const e = document.createElement("p"); e.textContent = p; el.querySelector(".body").append(e); });
+  l.points.forEach((p) => { const e = document.createElement("li"); e.textContent = p; el.querySelector("ul").append(e); });
+  $("#l-back").onclick = closeLesson;
+  $("#l-quiz").onclick = () => {
+    const today = dkey();
+    if (!state.read[t]) { state.read[t] = today; state.reads[today] = (state.reads[today] || 0) + 1; save(); }
+    closeLesson(); $("#topic-sel").value = t; start(3);
+  };
+  $("#start-sec").hidden = true; $("#quiz-sec").hidden = true; $("#next-lesson").hidden = true; $("#fergie").hidden = true;
+  $("#lesson-sec").hidden = false;
+  $("#lesson-sec").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+function closeLesson() { $("#lesson-sec").hidden = true; $("#start-sec").hidden = false; renderStats(); }
+
 // ---------- 表示 ----------
 function streak() {
   let k = dkey(), n = 0;
-  if (!state.days[k]) k = addDays(k, -1);
-  while (state.days[k]) { n++; k = addDays(k, -1); }
+  if (!state.days[k] && !state.reads[k]) k = addDays(k, -1);
+  while (state.days[k] || state.reads[k]) { n++; k = addDays(k, -1); }
   return n;
 }
 
@@ -326,7 +385,16 @@ function renderStats() {
   $("#b-exam").textContent = Math.max(0, Math.round((new Date(EXAM + "T00:00:00") - new Date(today + "T00:00:00")) / 864e5));
   $("#b-streak").textContent = streak();
   $("#b-today").textContent = state.days[today] || 0;
-  $("#fergie").hidden = !(new Date().getHours() >= 20 && !state.days[today] && !session);
+  $("#fergie").hidden = !(new Date().getHours() >= 20 && !state.days[today] && !state.reads[today] && !session);
+  const nx = L.find((l) => !state.read[l.topic]);
+  $("#next-lesson").hidden = !nx || !!session || !$("#lesson-sec").hidden;
+  if (nx) { $("#next-title").textContent = nx.topic; $("#next-lead").textContent = nx.lead; $("#next-btn").onclick = () => openLesson(nx.topic); }
+  $("#lesson-list").innerHTML = "";
+  L.forEach((l) => {
+    const b = document.createElement("button"); b.dataset.lesson = l.topic;
+    b.innerHTML = `<span class="mark${state.read[l.topic] ? " on" : ""}">${state.read[l.topic] ? "✓" : ""}</span><span></span>`;
+    b.lastElementChild.textContent = l.topic; $("#lesson-list").append(b);
+  });
   $("#total").textContent = Object.values(state.days).reduce((a, b) => a + b, 0);
 
   // 12週の草（月曜はじまり）
@@ -366,6 +434,7 @@ function renderStats() {
 
 document.addEventListener("click", (e) => {
   const st = e.target.closest("[data-start]"); if (st) { start(st.dataset.start); return; }
+  const ls = e.target.closest("[data-lesson]"); if (ls) { openLesson(ls.dataset.lesson); return; }
   const tp = e.target.closest("[data-topic]"); if (tp) { $("#topic-sel").value = tp.dataset.topic; start(10); }
 });
 document.addEventListener("keydown", (e) => {
@@ -479,7 +548,8 @@ $("#car-btn").onclick = () => {
   loadLocal();
   try { Q = await (await fetch("questions.json")).json(); } catch { setSync("問題集を読み込めませんでした"); return; }
   [...new Set(Q.map((q) => q.topic))].forEach((t) => $("#topic-sel").append(new Option(t, t)));
-  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><span>${t}</span><audio controls preload="none" src="audio/${String(i + 1).padStart(2, "0")}.m4a"></audio></div>`).join("");
+  try { L = await (await fetch("lessons.json")).json(); } catch {}
+  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><b>${t}</b><span class="muted">解説</span><audio controls preload="none" src="audio/L${pad2(i)}.m4a"></audio><span class="muted">問題</span><audio controls preload="none" src="audio/${pad2(i)}.m4a"></audio></div>`).join("");
   renderStats();
 })();
 </script>
