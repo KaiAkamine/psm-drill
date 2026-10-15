@@ -123,6 +123,10 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
 .points{background:var(--gold-soft);border-radius:10px;padding:12px 14px}
 .points ul{margin:4px 0 0;padding-left:20px}
 .lesson audio{width:100%}
+.en{display:flex;flex-wrap:wrap;gap:6px}
+.en span{border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:13px}
+.en span i{font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-left:6px}
+.pace{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -145,7 +149,7 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
   </div>
 
   <div class="next" id="next-lesson" hidden>
-    <div><span class="t">次に読む解説</span><b id="next-title"></b><span class="muted" id="next-lead" style="font-size:13px"></span></div>
+    <div><span class="t">次に読む解説</span><b id="next-title"></b><span class="muted" id="next-lead" style="font-size:13px"></span><div class="pace" id="pace"></div></div>
     <button class="btn" id="next-btn">読む</button>
   </div>
 
@@ -153,7 +157,7 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
     <div class="starts">
       <button class="start primary" data-start="1"><b>1問だけ</b><span>スマホの隙間に。約1分</span></button>
       <button class="start" data-start="10"><b>10問</b><span>約8分。復習が先に出ます</span></button>
-      <button class="start" data-start="mock"><b>模試20問</b><span>15分の時間制限つき</span></button>
+      <button class="start" data-start="mock"><b>ミニ模試20問</b><span>15分の時間制限つき</span></button>
     </div>
     <div class="suggest">
       <span id="week-hint" class="muted"></span>
@@ -354,11 +358,13 @@ function openLesson(t) {
   el.innerHTML = `<div class="qmeta"><span></span><span>${state.read[t] ? "読了 " + state.read[t] : ""}</span></div>
     <h3></h3><div class="body"></div>
     <div class="points"><b>要点</b><ul></ul></div>
+    <div><span class="muted" style="font-size:13px">英語では</span><div class="en"></div></div>
     <div><span class="muted" style="font-size:13px">音声で聞く</span><audio controls preload="none" src="audio/L${pad2(topicNo(t))}.m4a"></audio></div>
     <div class="actions"><button class="btn ghost" id="l-back">戻る</button><button class="btn" id="l-quiz">読んだ。3問で確かめる</button></div>`;
   el.querySelector(".qmeta span").textContent = t;
   el.querySelector("h3").textContent = l.lead;
   l.body.forEach((p) => { const e = document.createElement("p"); e.textContent = p; el.querySelector(".body").append(e); });
+  (l.en || []).forEach(([ja, en]) => { const e = document.createElement("span"); e.textContent = ja; const i = document.createElement("i"); i.textContent = en; e.append(i); el.querySelector(".en").append(e); });
   l.points.forEach((p) => { const e = document.createElement("li"); e.textContent = p; el.querySelector("ul").append(e); });
   $("#l-back").onclick = closeLesson;
   $("#l-quiz").onclick = () => {
@@ -388,6 +394,9 @@ function renderStats() {
   $("#fergie").hidden = !(new Date().getHours() >= 20 && !state.days[today] && !state.reads[today] && !session);
   const nx = L.find((l) => !state.read[l.topic]);
   $("#next-lesson").hidden = !nx || !!session || !$("#lesson-sec").hidden;
+  const LESSON_DUE = "2026-11-08"; // ロードマップのフェーズ1（ガイドを知る）の終わり
+  const readN = L.filter((l) => state.read[l.topic]).length, leftD = Math.round((new Date(LESSON_DUE + "T00:00:00") - new Date(today + "T00:00:00")) / 864e5) + 1;
+  $("#pace").textContent = leftD > 0 ? `解説 ${readN}/${L.length}・11/8 までに読み終える目安（あと${leftD}日、${Math.max(1, Math.ceil((L.length - readN) / leftD))}日1本ペース）` : `解説 ${readN}/${L.length}・目安の 11/8 を過ぎています。残りも1日1本で大丈夫です`;
   if (nx) { $("#next-title").textContent = nx.topic; $("#next-lead").textContent = nx.lead; $("#next-btn").onclick = () => openLesson(nx.topic); }
   $("#lesson-list").innerHTML = "";
   L.forEach((l) => {
