@@ -123,6 +123,8 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
 .points{background:var(--gold-soft);border-radius:10px;padding:12px 14px}
 .points ul{margin:4px 0 0;padding-left:20px}
 .lesson audio{width:100%}
+.lesson video{width:100%;border-radius:10px;background:#000;aspect-ratio:16/9}
+.vlinks{display:flex;gap:12px;font-size:13px}
 .en{display:flex;flex-wrap:wrap;gap:6px}
 .en span{border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:13px}
 .en span i{font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-left:6px}
@@ -210,10 +212,12 @@ select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px 
       <div id="car-heard" class="muted" style="font-size:13px"></div>
     </div>
     <div class="card">
-      <p><b>聞くだけ</b>：テーマ別の音声です。最初は「解説」を聞いて知識を入れ、慣れたら「問題」に進んでください。問題の音声は、問題、考える間、正解と解説の順に流れます。</p>
+      <p><b>聞くだけ</b>：ずんだもんが読み上げるテーマ別の音声です。最初は「解説」を聞いて知識を入れ、慣れたら「問題」に進んでください。問題の音声は、問題、考える間、正解と解説の順に流れます。</p>
       <div class="audios" id="audios"></div>
     </div>
   </section>
+
+  <p class="muted" style="font-size:12px;margin:0">音声：VOICEVOX:ずんだもん　イラスト：東北ずん子・ずんだもんプロジェクト公式素材</p>
 </div>
 
 <script>
@@ -356,10 +360,12 @@ function openLesson(t) {
   const l = L.find((x) => x.topic === t); if (!l) return;
   const el = $("#lesson");
   el.innerHTML = `<div class="qmeta"><span></span><span>${state.read[t] ? "読了 " + state.read[t] : ""}</span></div>
-    <h3></h3><div class="body"></div>
+    <h3></h3>
+    <video controls preload="none" playsinline src="video/L${pad2(topicNo(t))}.mp4"></video>
+    <div class="body"></div>
     <div class="points"><b>要点</b><ul></ul></div>
     <div><span class="muted" style="font-size:13px">英語では</span><div class="en"></div></div>
-    <div><span class="muted" style="font-size:13px">音声で聞く</span><audio controls preload="none" src="audio/L${pad2(topicNo(t))}.m4a"></audio></div>
+    <div><span class="muted" style="font-size:13px">音声だけで聞く</span><audio controls preload="none" src="audio/L${pad2(topicNo(t))}.m4a"></audio></div>
     <div class="actions"><button class="btn ghost" id="l-back">戻る</button><button class="btn" id="l-quiz">読んだ。3問で確かめる</button></div>`;
   el.querySelector(".qmeta span").textContent = t;
   el.querySelector("h3").textContent = l.lead;
@@ -558,7 +564,7 @@ $("#car-btn").onclick = () => {
   try { Q = await (await fetch("questions.json")).json(); } catch { setSync("問題集を読み込めませんでした"); return; }
   [...new Set(Q.map((q) => q.topic))].forEach((t) => $("#topic-sel").append(new Option(t, t)));
   try { L = await (await fetch("lessons.json")).json(); } catch {}
-  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><b>${t}</b><span class="muted">解説</span><audio controls preload="none" src="audio/L${pad2(i)}.m4a"></audio><span class="muted">問題</span><audio controls preload="none" src="audio/${pad2(i)}.m4a"></audio></div>`).join("");
+  $("#audios").innerHTML = [...new Set(Q.map((q) => q.topic))].map((t, i) => `<div><b>${t}</b><span class="vlinks"><a href="video/L${pad2(i)}.mp4" target="_blank" rel="noopener">解説の動画</a><a href="video/${pad2(i)}.mp4" target="_blank" rel="noopener">問題の動画</a></span><span class="muted">解説</span><audio controls preload="none" src="audio/L${pad2(i)}.m4a"></audio><span class="muted">問題</span><audio controls preload="none" src="audio/${pad2(i)}.m4a"></audio></div>`).join("");
   renderStats();
 })();
 </script>
